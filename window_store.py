@@ -12,8 +12,13 @@ class WindowStore:
             lambda: SortedList(key=lambda x: x[0])
         )
 
+    @property
+    def _cutoff(self) -> float:
+        return time.time() - self.window_seconds
+
     def upsert(self, key: Any, timestamp: float, record: Any) -> None:
-        self.store[key].add((timestamp, record))
+        if timestamp >= self._cutoff:
+            self.store[key].add((timestamp, record))
         self._evict(key)
 
     def query(self, key: Any, at_timestamp: float) -> list[Any]:
@@ -29,7 +34,7 @@ class WindowStore:
         return result
 
     def _evict(self, key: Any) -> None:
-        cutoff = time.time() - self.window_seconds * 2
+        cutoff = self._cutoff
         records = self.store[key]
         while records and records[0][0] < cutoff:  # type: ignore[operator]
             records.pop(0)

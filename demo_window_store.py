@@ -48,23 +48,6 @@ def demo_multiple_users():
     print()
 
 
-def demo_eviction():
-    print("=== Automatic Eviction ===")
-    store = WindowStore(window_seconds=5)
-    old_time = time.time() - 20
-    now = time.time()
-
-    store.upsert("events", old_time, "very_old")
-    store.upsert("events", now - 3, "recent")
-    store.upsert("events", now, "current")
-
-    print(f"Before eviction: {len(store.store['events'])} records")
-    store._evict("events")
-    print(f"After eviction: {len(store.store['events'])} records")
-    print(f"Remaining: {store.query('events', now)}")
-    print()
-
-
 def demo_streaming_scenario():
     print("=== Streaming Scenario ===")
     store = WindowStore(window_seconds=2)
@@ -83,5 +66,4 @@ if __name__ == "__main__":
     demo_basic()
     demo_time_windowing()
     demo_multiple_users()
-    demo_eviction()
     demo_streaming_scenario()

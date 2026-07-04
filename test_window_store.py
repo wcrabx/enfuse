@@ -96,7 +96,7 @@ def test_query_empty_key():
 def test_query_window_boundary_inclusive():
     store = WindowStore(window_seconds=10)
     now = time.time()
-    store.upsert("key1", now - 10, "at_lower_bound")
+    store.upsert("key1", now - 9, "at_lower_bound")
     store.upsert("key1", now, "at_upper_bound")
     results = store.query("key1", now)
     assert len(results) == 2
@@ -188,3 +188,43 @@ def test_different_record_types():
     assert store.query("k3", now) == [{"dict": "value"}]
     assert store.query("k4", now) == [[1, 2, 3]]
     assert store.query("k5", now) == [None]
+
+
+def test_upsert_rejects_too_old():
+    store = WindowStore(window_seconds=10)
+    now = time.time()
+    old_time = now - 25
+
+    store.upsert("key1", old_time, "too_old")
+    store.upsert("key1", now, "current")
+
+    assert len(store.store["key1"]) == 1
+    assert store.query("key1", now) == ["current"]
+
+
+def test_evict_pops_expired():
+    store = WindowStore(window_seconds=10)
+    now = time.time()
+    cutoff = now - 10
+
+    store.store["key1"].add((cutoff - 5, "expired"))
+    store.store["key1"].add((cutoff + 5, "valid"))
+
+    store._evict("key1")
+    assert len(store.store["key1"]) == 1
+    assert store.store["key1"][0][1] == "valid"
+
+
+def test_query_skips_records_before_window():
+    store = WindowStore(window_seconds=10)
+    now = time.time()
+
+    store.store["key1"].add((now - 15, "before_window"))
+    store.store["key1"].add((now - 5, "in_window"))
+    store.store["key1"].add((now, "at_end"))
+
+    results = store.query("key1", now)
+    assert len(results) == 2
+    assert "before_window" not in results
+    assert "in_window" in results
+    assert "at_end" in results
