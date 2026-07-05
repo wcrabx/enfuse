@@ -1,4 +1,5 @@
 import time
+import threading
 from window_store import WindowStore
 
 
@@ -228,3 +229,30 @@ def test_query_skips_records_before_window():
     assert "before_window" not in results
     assert "in_window" in results
     assert "at_end" in results
+
+
+def test_thread_safety():
+    store = WindowStore(window_seconds=10)
+    now = time.time()
+
+    def upsert_many():
+        for i in range(100):
+            store.upsert("key1", now + i * 0.01, f"record{i}")
+
+    def query_many():
+        for i in range(100):
+            store.query("key1", now + i * 0.01)
+
+    threads = [
+        threading.Thread(target=upsert_many),
+        threading.Thread(target=upsert_many),
+        threading.Thread(target=query_many),
+        threading.Thread(target=query_many),
+    ]
+
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(store.query("key1", now + 1)) > 0
